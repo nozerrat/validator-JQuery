@@ -1,4 +1,4 @@
-(function( win, factory ) { factory( win ); }( this,function( win ){
+(function( win, factory ) { factory( win ); }( window,function( win ){
 
 	win.Validator = {
 			error: false,
