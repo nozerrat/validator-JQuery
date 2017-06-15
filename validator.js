@@ -21,6 +21,7 @@
 				classHasSuccess: 'has-success',
 				classFormGroup: 'form-group',
 				classHelpBlock: 'help-block',
+				addClassHelpBlock: '',
 				local: 'es',
 				messages: {
 					en: {},
@@ -147,7 +148,6 @@
 							formGroup = formGroup.parentNode
 						}while( !regExpClassFormGroup.test( formGroup.className ) && !!formGroup );
 
-
 						// Se busca el help-block en donde se mostrarán los mensajes de error
 						var children = formGroup.getElementsByTagName( '*' );
 						for ( var j = 0; j < children.length; j++ ) {
@@ -159,14 +159,20 @@
 						}
 
 						if ( !helpBlockExist ) {
-							helpBlock = document.createElement( "span" );
+							helpBlock = document.createElement( "small" );
 							textNode = document.createTextNode('&nbsp;');
-							helpBlock.setAttribute( "class", this.options.classHelpBlock );
-							helpBlock.setAttribute( "style", 'display:none;position:relative;margin-top:-4px;margin-bottom:-14px;' );
-							helpBlock.append( textNode );
-							element.parentNode.appendChild( helpBlock );
-						}
+							helpBlock.setAttribute( "class", this.options.classHelpBlock +' '+ this.options.addClassHelpBlock );
+							helpBlock.setAttribute( "style", 'display:none;position:relative;margin-top:0;margin-bottom:0;' );
+							
+							var br = document.createElement( "div" );
+							// br.setAttribute( "clear", 'both' );
+							br.setAttribute( "style", 'clear:both;' );
 
+							helpBlock.append( textNode );
+							// element.parentNode.appendChild( helpBlock );
+							formGroup.append( br );
+							formGroup.append( helpBlock );
+						}
 
 						// Se registran los elementos para su validación
 						this.fields[ field ]  = {
@@ -182,6 +188,7 @@
 							var event = this.getEvent( event );
 							var target = this.getTarget( event );
 							var field = target.getAttribute('name');
+
 							this.exec( field );
 						}.bind( this );
 
@@ -189,6 +196,8 @@
 						this.addHandler( element,'blur',handlerEvent );
 						this.addHandler( element,'change',handlerEvent );
 						this.addHandler( element,'keyup',handlerEvent );
+						this.addHandler( element,'keydown',handlerEvent );
+						this.addHandler( element,'click',handlerEvent );
 					}
 				}
 
@@ -578,17 +587,26 @@
 				}
 			},
 		
+			/*
+				Si existe un campo A y B, si en A se expecifica la validación "required_if:B" 
+				entonce A es requerido y en B hay valor.
+
+				<form>
+					<input id="A" aria-rules="required_if:B" />
+					<input id="B" aria-rules="" />
+				</form>
+			 */
 			required_if: function (rule, field, param ) {
 				var value = this.fields[field].element.value.trim();
+
 				param[0] = param[0]||'';
 				if(!param.length || !param[0]) throw console.error('El parametro de la regla {'+rule+'} es incorrecto');
+
 
 				for ( _field in param) {
 					var elm1 = this.fields[field].element;
 					var elm2 = this.fields[param[_field]].element;
-
 					this.reference_if[param[_field]] = field;
-
 					if ( !elm1.value && elm2.value )  {
 						this._applyMessageFail( field, this._getMsg( rule, field, param ) );
 						return true;
@@ -660,8 +678,8 @@
 					console.error( err );
 					throw console.error( 'El parametro \'' + param[0] + '\' de la regla \'same\' ho ha sido identificado' );
 				}
-				
-				this.exec(field);
+
+				this.exec( field );
 				elm1.rules = rules_temp;
 				
 				if ( this.field_success[field] ) {
@@ -712,6 +730,7 @@
 			},
 		
 			text: function (rule, field, param ) {
+				this._success( field );
 				return false;
 			},
 		
@@ -734,7 +753,7 @@
 					this.fields[field].formGroup.className;
 					this.fields[field].element.value;
 				}catch( e ){
-					console.error( e.message + '. El formulario no esta definido' );
+					console.error( e.message + '\nEl campo "' + field + '" no esta definido en el formulario' );
 					error = true;
 				}
 				return error;
@@ -743,14 +762,29 @@
 		
 			_applyMessageFail: function( field, message ) {
 				if ( this._errorHandle( field ) ) return;
+				var regExpClassHasError = new RegExp( this.options.classHasError );
 
-				this.fields[field].formGroup.className = this.options.classFormGroup+' '+this.options.classHasError;
+				this.fields[field].formGroup.className = this.fields[field].formGroup.className.replace(this.options.classHasError,'');
+				this.fields[field].formGroup.className = this.fields[field].formGroup.className.replace(this.options.classHasSuccess,'');
+
+				if ( !regExpClassHasError.test( this.fields[field].formGroup.className ) ) {
+					this.fields[field].formGroup.className = this.fields[field].formGroup.className+' '+this.options.classHasError;
+				}
+
 				this.fields[field].helpBlock.style.display = 'block';
 				this.fields[field].helpBlock.innerHTML = message;
 			},
 		
 			_success: function( field ) {
-				this.fields[field].formGroup.className = this.options.classFormGroup+' '+this.options.classHasSuccess;
+				var regExpClassHasSuccess = new RegExp( this.options.classHasSuccess );
+
+				this.fields[field].formGroup.className = this.fields[field].formGroup.className.replace(this.options.classHasError,'');
+				this.fields[field].formGroup.className = this.fields[field].formGroup.className.replace(this.options.classHasSuccess,'');
+
+				if ( !regExpClassHasSuccess.test( this.fields[field].formGroup.className ) ) {
+					this.fields[field].formGroup.className = this.fields[field].formGroup.className+' '+this.options.classHasSuccess;
+				}
+
 				this.fields[field].helpBlock.style.display = 'none';
 			},
 		
@@ -879,57 +913,68 @@
 			},
 
 		
-			exec: function( field ) {
+			exec: function( field, isRecursive ) {
 				if( !field ) return;
-				
-				var rules = this.fields[field].rules;
 
 				// si el campo es referenciado en la regla required_if
 				if ( this.reference_if[field] ) 
-					this.exec( this.reference_if[field] );
+					this.exec( this.reference_if[field], true );
 
 				// si el campo es referenciado en la regla required_with
 				if ( this.reference_with[field] ) 
-					this.exec( this.reference_with[field] );
+					this.exec( this.reference_with[field], true );
 
 				// si el campo es referenciado en la regla required_less
 				if ( this.reference_less[field] ) 
-					this.exec( this.reference_less[field] );
+					this.exec( this.reference_less[field], true );
 
 				// si el campo es referenciado en la regla required_same
 				if ( this.reference_same[field] ) 
-					this.exec( this.reference_same[field] );
+					this.exec( this.reference_same[field], true );
 				
 
-				for ( var i = 0; i < rules.length; i++ ) {
-					if ( !rules[i].trim() ) continue;
-					var param = [];
-					var rule = rules[i].trim();
-					var match = rule.match(/:/);
-					if ( match ) {
-						rule = match.input.slice(0,match.index)
-						param = match.input.slice(match.index+1).split(',');
+				if ( !isRecursive ) {
+					var rules = this.fields[field].rules;
+					for ( var i = 0; i < rules.length; i++ ) {
+						if ( rules[i].trim() ) {
+							var param = [];
+							var rule = rules[i].trim();
+							var match = rule.match(/:/);
+							if ( match ) {
+								rule = match.input.slice(0,match.index);
+								param = match.input.slice(match.index+1).split(',');
+							}
+
+							// llamamos la funcion a la que le compete la regla
+							var error = this[rule]( rule, field, param );
+
+							this.field_error[field] = error;
+							this.field_success[field] = !error;
+
+							if ( error && !this.error ) {
+								this.error = error;
+								this.success = !error;
+							}
+
+							if ( error ) break;
+						}
 					}
-
-					// llamamos la funcion a la que le compete la regla
-					var error = this[rule]( rule, field, param );
-
-					this.field_error[field] = error;
-					this.field_success[field] = !error;
-
-					if ( error && !this.error ) {
-						this.error = error;
-						this.success = !error;
-					}
-
-					if ( error ) break;
 				}
+
 				return this;
 			},
 		
 			cleanAll: function() {
 				for ( var field in this.fields) {
-					this.fields[field].formGroup.className = this.options.classFormGroup;
+					this.fields[field].formGroup.className = this.fields[field].formGroup.className.replace(this.options.classHasError,'');
+					this.fields[field].formGroup.className = this.fields[field].formGroup.className.replace(this.options.classHasSuccess,'');
+
+					var regExpClassFormGroup = new RegExp( this.options.classFormGroup );
+
+					if ( !regExpClassFormGroup.test( this.fields[field].formGroup.className ) ) {
+						this.fields[field].formGroup.className = this.options.classFormGroup+' '+this.fields[field].formGroup.className ;
+					}
+
 					this.fields[field].helpBlock.style.display = 'none';
 					this.error = false;
 					this.success = true;
@@ -945,7 +990,16 @@
 			},// End clean
 		
 			clean: function(field) {
-				this.fields[field].formGroup.className = this.options.classFormGroup;
+				this.fields[field].formGroup.className = this.fields[field].formGroup.className.replace(this.options.classHasError,'');
+				this.fields[field].formGroup.className = this.fields[field].formGroup.className.replace(this.options.classHasSuccess,'');
+
+				var regExpClassFormGroup = new RegExp( this.options.classFormGroup );
+
+				if ( !regExpClassFormGroup.test( this.fields[field].formGroup.className ) ) {
+					this.fields[field].formGroup.className = this.options.classFormGroup+' '+this.fields[field].formGroup.className ;
+				}
+
+
 				this.fields[field].helpBlock.style.display = 'none';
 				return this;
 			},
@@ -976,8 +1030,8 @@
 			run: function() {
 				this.error = false;
 				this.success = true;
-				for ( var field in this.fields) {
-					this.exec(field);
+				for ( var field in this.fields ) {
+					this.exec( field );
 				}
 				return this;
 			},
