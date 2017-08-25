@@ -131,75 +131,84 @@
                length = 0;
             }
 
-            for ( var i=0; i<length; i++ ) {
-               var element = forms[ i ];
-               var field;
-               try { field = element.getAttribute( 'name' ) }
-               catch( err ) { field = null }
-               if ( field ) {
-                  var regExpClassFormGroup = new RegExp( this.options.classFormGroup );
-                  var regExpClassHelpBlock = new RegExp( this.options.classHelpBlock );
-                  var formGroup = element;
-                  var helpBlock, textNode, helpBlockExist = false;
-                  
+            setTimeout(function() {
+               for ( var i=0; i<length; i++ ) {
 
-                  // Se busca el nodo form-group 
-                  do{
-                     formGroup = formGroup.parentNode
-                  }while( !regExpClassFormGroup.test( formGroup.className ) && !!formGroup );
+                  var element = forms[ i ];
+                  var field;
 
-                  // Se busca el help-block en donde se mostrarán los mensajes de error
-                  var children = formGroup.getElementsByTagName( '*' );
-                  for ( var j = 0; j < children.length; j++ ) {
-                     helpBlock = children[j];
-                     if ( regExpClassHelpBlock.test( helpBlock.className ) ) {
-                        helpBlockExist = true;
-                        break;
-                     }
+                  try { 
+                     field = element.getAttribute( 'name' );
+                  }
+                  catch( err ) { 
+                     field = null 
                   }
 
-                  if ( !helpBlockExist ) {
-                     helpBlock = document.createElement( "small" );
-                     textNode = document.createTextNode('&nbsp;');
-                     helpBlock.setAttribute( "class", this.options.classHelpBlock +' '+ this.options.addClassHelpBlock );
-                     helpBlock.setAttribute( "style", 'display:none;position:relative;margin-top:0;margin-bottom:0;' );
+                  if ( field ) {
+                     var regExpClassFormGroup = new RegExp( this.options.classFormGroup );
+                     var regExpClassHelpBlock = new RegExp( this.options.classHelpBlock );
+                     var formGroup = element;
+                     var helpBlock, textNode, helpBlockExist = false;
                      
-                     var br = document.createElement( "div" );
-                     // br.setAttribute( "clear", 'both' );
-                     br.setAttribute( "style", 'clear:both;' );
+                     // Se busca el nodo form-group 
+                     do{
+                        formGroup = formGroup.parentNode
+                     }while( !regExpClassFormGroup.test( formGroup.className ) && !!formGroup );
 
-                     helpBlock.append( textNode );
-                     // element.parentNode.appendChild( helpBlock );
-                     formGroup.append( br );
-                     formGroup.append( helpBlock );
+                     // Se busca el help-block en donde se mostrarán los mensajes de error
+                     var children = formGroup.getElementsByTagName( '*' );
+                     for ( var j = 0; j < children.length; j++ ) {
+                        helpBlock = children[j];
+                        if ( regExpClassHelpBlock.test( helpBlock.className ) ) {
+                           helpBlockExist = true;
+                           break;
+                        }
+                     }
+
+                     if ( !helpBlockExist ) {
+                        helpBlock = document.createElement( "small" );
+                        textNode = document.createTextNode('&nbsp;');
+                        helpBlock.setAttribute( "class", this.options.classHelpBlock +' '+ this.options.addClassHelpBlock );
+                        helpBlock.setAttribute( "style", 'display:none;position:relative;margin-top:0;margin-bottom:0;' );
+                        
+                        var br = document.createElement( "div" );
+                        // br.setAttribute( "clear", 'both' );
+                        br.setAttribute( "style", 'clear:both;' );
+
+                        helpBlock.append( textNode );
+                        // element.parentNode.appendChild( helpBlock );
+                        formGroup.append( br );
+                        formGroup.append( helpBlock );
+                     }
+
+                     // Se registran los elementos para su validación
+                     this.fields[ field ]  = {
+                        forms: forms,
+                        rules: (element.getAttribute( 'aria-rules' ) || '').split( '|' ),
+                        element: element,
+                        formGroup: formGroup,
+                        helpBlock: helpBlock
+                     };
+
+
+                     var handlerEvent = function( event ) {
+                        var event  = this.getEvent( event );
+                        var target = this.getTarget( event );
+                        var field  = target.getAttribute('name');
+                        this.exec( field );
+                     }.bind( this );
+
+
+                     this.addHandler( element,'focus',handlerEvent );
+                     this.addHandler( element,'blur',handlerEvent );
+                     this.addHandler( element,'change',handlerEvent );
+                     this.addHandler( element,'keyup',handlerEvent );
+                     this.addHandler( element,'keydown',handlerEvent );
+                     this.addHandler( element,'click',handlerEvent );
                   }
 
-                  // Se registran los elementos para su validación
-                  this.fields[ field ]  = {
-                     forms: forms,
-                     rules: (element.getAttribute( 'aria-rules' ) || '').split( '|' ),
-                     element: element,
-                     formGroup: formGroup,
-                     helpBlock: helpBlock
-                  };
-
-
-                  var handlerEvent = function( event ) {
-                     var event = this.getEvent( event );
-                     var target = this.getTarget( event );
-                     var field = target.getAttribute('name');
-
-                     this.exec( field );
-                  }.bind( this );
-
-
-                  this.addHandler( element,'blur',handlerEvent );
-                  this.addHandler( element,'change',handlerEvent );
-                  this.addHandler( element,'keyup',handlerEvent );
-                  this.addHandler( element,'keydown',handlerEvent );
-                  this.addHandler( element,'click',handlerEvent );
                }
-            }
+            }.bind(this), 500);
 
             return this;
          },
@@ -771,7 +780,8 @@
                this.fields[field].formGroup.className = this.fields[field].formGroup.className+' '+this.options.classHasError;
             }
 
-            this.fields[field].helpBlock.style.display = 'block';
+            this.fields[field].helpBlock.style.display    = 'block';
+            this.fields[field].helpBlock.style.fontWeight = 'bold';
             this.fields[field].helpBlock.innerHTML = message;
          },
       
